@@ -1,0 +1,79 @@
+#!/bin/bash
+###########################
+# Nathan Bohman           #
+# XMission                #
+# Compromised Site Search #
+# 2014-06-13              #
+# Version 1.3             #
+###########################
+
+#Types of files to exclude in regex format. Don't need to scan binary files as they are usually not compromised
+EXCLUDE="\"log|jpe?g$|gif$|png$|tar(.gz|.bz)?$|zip$\""
+
+#Default parameters
+DEBUG="NO"
+COLOR="always"
+DIR="."
+THREADS="150%"
+
+#Locations and arguments
+eval LASTARG=${!#}
+SCRIPTPATH="/usr/local/bin/"
+SCRIPTNAME=$(echo $0 | rev | cut -d/ -f1 | rev)
+SCRIPTREGEX=$(echo "$SCRIPTPATH $SCRIPTNAME _terms" | tr -d ' ')
+
+#Check to see if any arguments passed
+if [[ $# -gt 0 ]]; then
+
+	#Make sure last arugment isn't a flag instead of a path
+	if [[ $(echo $LASTARG | egrep "\/" | wc -l) -gt 0 ]]; then
+
+		#If last argument is a path, set the path to scan
+		DIR=${!#}
+	fi
+fi
+
+#Loop through arguments setting variables
+while [ $# -gt 0 ]; do
+	case "$1" in
+		-h|--help)
+			echo "USAGE: $SCRIPTNAME [OPTION] [DIRECTORY]"
+			echo "Search for compromised websites using search terms in $0_terms"
+			echo ""
+			echo -e "-c|--color|--colour (never|always)\t- Colorize output"
+			echo -e "-t|--threads x\t\t\t\t- Number of threads of grep to run. Can be expressed as a percentage of cores (default $THREADS)"
+			echo -e "-d|--debug\t\t\t\t- Echo out search command, don't run it"
+			echo ""
+			echo "Examples:"
+			echo "Debug scanning home directory with 2 grep processes for each processor core and don't colorize output"
+			echo "$SCRIPTNAME -d -t 200% -c never ~"
+			echo ""
+			echo "Scan Stacey's home directory with 2 simultaneous greps"
+			echo "$SCRIPTNAME -t 2 ~stacey"
+			echo ""
+			echo "Script created and maintained by Natrinicle (Nathan Bohman)"
+			exit 0
+			;;
+		-c|--color|--colour)
+			shift
+			COLOR=$1
+			;;
+		-t|--threads)
+			shift
+			THREADS=$1
+			;;
+		-d|--debug)
+			DEBUG=YES
+			;;
+	esac
+
+	#Check next set of parameters
+	shift
+done
+
+#Check to see if debugging and if so, echo find command instead of running it
+if [[ "$DEBUG" == "YES" ]]; then
+    echo "find $DIR -type f | egrep -vi $EXCLUDE | parallel -k -j$THREADS -n 1000 -m egrep -Hni --color=$COLOR $(cat $SCRIPTREGEX | tr '\n' '|' | sed 's/.$/\"/;s/^/"/;s/|/\|/g;s/ /\\ /g') {} 2>/dev/null"
+else
+    find $DIR -type f | egrep -vi $EXCLUDE | parallel -k -j$THREADS -n 1000 -m egrep -Hni --color=$COLOR $(cat $SCRIPTREGEX | tr '\n' '|' | sed 's/.$/\"/;s/^/"/;s/|/\|/g;s/ /\\ /g') {} 2>/dev/null
+fi
